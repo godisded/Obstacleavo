@@ -1,0 +1,204 @@
+#include <IRremote.h>
+#include <Servo.h>
+
+#define MotorR1 4
+#define MotorR2 5
+#define MotorL1 6
+#define MotorL2 7
+#define Motor_c1 3
+#define Motor_c2 11
+#define echo 12
+#define trig 13
+#define IRreceiver 10 
+#define button_2 3108437760
+#define button_8 3927310080
+#define button_4 3141861120
+#define button_6 3158572800
+#define button_5 3208707840
+#define button_0 3860463360
+
+int isoto = 0;
+int change = 0;
+Servo ourservo1;
+
+void setup() {
+  Serial.begin(9600);
+  IrReceiver.begin(IRreceiver, true);
+
+  pinMode(IRreceiver, INPUT);
+  pinMode(echo, INPUT);
+  pinMode(trig, OUTPUT);
+  pinMode(MotorR1, OUTPUT);
+  pinMode(MotorR2, OUTPUT);
+  pinMode(MotorL1, OUTPUT);
+  pinMode(MotorL2, OUTPUT);
+  pinMode(Motor_c1, OUTPUT);
+  pinMode(Motor_c2, OUTPUT);
+
+  digitalWrite(MotorR1, LOW);
+  digitalWrite(MotorR2, LOW);
+  digitalWrite(MotorL1, LOW);
+  digitalWrite(MotorL2, LOW);
+  digitalWrite(Motor_c1, LOW);
+  digitalWrite(Motor_c2, LOW);
+
+  ourservo1.attach(9, 500, 2500);
+  ourservo1.write(90);
+}
+
+void loop() {
+  int dist = distance_calculation();
+  if (dist >= 40) {
+    change = 1;
+    operating_move();
+  }
+  while (dist >= 40) {
+    dist = distance_calculation();
+    operating_move();
+  }
+  change = 5;
+  operating_move();
+
+  int checkposition = findtheShort();
+  change_direction(checkposition);
+}
+
+int distance_calculation() {
+  long duration, distance;
+  digitalWrite(trig, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trig, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trig, LOW);
+  duration = pulseIn(echo, HIGH);
+  distance = duration / 29.1 / 2;
+  return distance;
+}
+
+void remoteFunction() {
+  if (IrReceiver.decode()) {
+    auto command = IrReceiver.decodedIRData.decodedRawData;
+    executeCommand(command);
+    Serial.println(command);
+    IrReceiver.resume();
+  }
+}
+
+void executeCommand(uint32_t command) {
+  switch (command) {
+    case button_2:
+      isoto = 1;
+      break;
+    case button_8:
+      isoto = 4;
+      break;
+    case button_4:
+      isoto = 4;
+      break;
+    case button_6:
+      isoto = 2;
+      break;
+    case button_5:
+      isoto = 5;
+      break;
+    case button_0:
+      isoto = 0;
+      break;
+  }
+}
+
+void change_direction(int checkposition) {
+  switch (checkposition) {
+    case 0:
+      change = 3;
+      operating_move();
+      delay(2000);
+      break;
+    case 1:
+      change = 4;
+      operating_move();
+      delay(2000);
+      change_direction(findtheShort());
+      delay(2000);
+      break;
+    case 2:
+      change = 2;
+      operating_move();
+      delay(2000);
+      break;
+  }
+}
+
+void operating_move() {
+  if (isoto == 0) {
+    switch (change) {
+      case 1:
+        motor_movement(120, 120, 1, 0, 1, 0);
+        break;
+      case 2:
+        motor_movement(240, 120, 0, 1, 1, 0);
+        break;
+      case 3:
+        motor_movement(120, 240, 1, 0, 0, 1);
+        break;
+      case 4:
+        motor_movement(60, 60, 0, 1, 0, 1);
+        break;
+      case 5:
+        motor_movement(0, 0, 0, 0, 0, 0);
+        break;
+    }
+  } else {
+    switch (isoto) {
+      case 1:
+        motor_movement(120, 120, 1, 0, 1, 0);
+        break;
+      case 2:
+        motor_movement(240, 120, 0, 1, 1, 0);
+        break;
+      case 3:
+        motor_movement(120, 240, 1, 0, 0, 1);
+        break;
+      case 4:
+        motor_movement(60, 60, 0, 1, 0, 1);
+        break;
+      case 5:
+        motor_movement(0, 0, 0, 0, 0, 0);
+        break;
+    }
+  }
+}
+
+void motor_movement(int speed_1, int speed_2, int value1, int value2, int value3, int value4) {
+  digitalWrite(MotorR1, value2);
+  digitalWrite(MotorR2, value1);
+  digitalWrite(MotorL1, value4);
+  digitalWrite(MotorL2, value3);
+
+  analogWrite(Motor_c1, speed_1);
+  analogWrite(Motor_c2, speed_2);
+}
+
+int findtheShort() {
+  int wtgo[2] = {0, 0};
+  int checkposition = 1;
+
+  ourservo1.write(135);
+  delay(1000);
+  wtgo[0] = distance_calculation();
+
+  ourservo1.write(45);
+  delay(1000);
+  wtgo[1] = distance_calculation();
+
+  if (wtgo[0] >= 200 && wtgo[1] >= 200) {
+    checkposition = 0;
+  } else if (wtgo[0] <= 40 && wtgo[1] <= 40) {
+    checkposition = 1;
+  } else if (wtgo[0] >= wtgo[1]) {
+    checkposition = 2;
+  } else if (wtgo[0] < wtgo[1]) {
+    checkposition = 0;
+  }
+  return checkposition;
+}
